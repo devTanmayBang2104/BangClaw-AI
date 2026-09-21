@@ -6,9 +6,14 @@
   "bin": {
     "bangclaw": "./index.ts"
   },
+  "scripts": {
+    "start": "tsx index.ts wakeup",
+    "check": "tsc --noEmit"
+  },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.7.0"
+    "@types/node": "^25.7.0",
+    "typescript": "^7.0.2"
   },
   "peerDependencies": {
     "typescript": "^5"
