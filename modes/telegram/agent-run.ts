@@ -67,8 +67,11 @@ function extraWebTools(tracker: ActionTracker) {
 }
 
 
-export async function runAsk(ctx:{reply:(t:string , o?:object)=>Promise<unknown>} , question:string){
-     const config = readOnlyConfig();
+export async function runAsk(
+  ctx: { reply: (t: string, o?: object) => Promise<unknown> },
+  question: string
+) {
+  const config = readOnlyConfig();
   const tracker = new ActionTracker();
   const executor = new ToolExecutor(tracker, config);
   const tools = { ...createReadOnlyTools(executor), ...extraWebTools(tracker) };
@@ -77,11 +80,19 @@ export async function runAsk(ctx:{reply:(t:string , o?:object)=>Promise<unknown>
     tools,
   });
 
-  const {text} = await agent.generate({prompt:question});
-  await replyMd(ctx , text || ("no answer"))
+  try {
+    const { text } = await agent.generate({ prompt: question });
+    await replyMd(ctx, text || "no answer");
+  } catch (err: any) {
+    await ctx.reply(`❌ AI Error: ${err?.message || "Failed to process question. Please try again."}`);
+  }
 }
 
-export async function runAgent(ctx: { reply: (t: string, o?: object) => Promise<unknown> }, chatId: number, goal: string) {
+export async function runAgent(
+  ctx: { reply: (t: string, o?: object) => Promise<unknown> },
+  chatId: number,
+  goal: string
+) {
   const config = defaultAgentConfig();
   const tracker = new ActionTracker();
   const executor = new ToolExecutor(tracker, config);
@@ -90,16 +101,21 @@ export async function runAgent(ctx: { reply: (t: string, o?: object) => Promise<
     ...agentOptions(config, 40),
     tools,
   });
-  const { text } = await agent.generate({ prompt: goal });
-  if (text?.trim()) await replyMd(ctx, text.trim());
- await finishOrApprove(ctx, chatId, tracker, executor, '✅ Done. No file changes were needed.');
+
+  try {
+    const { text } = await agent.generate({ prompt: goal });
+    if (text?.trim()) await replyMd(ctx, text.trim());
+    await finishOrApprove(ctx, chatId, tracker, executor, '✅ Done. No file changes were needed.');
+  } catch (err: any) {
+    await ctx.reply(`❌ Agent Error: ${err?.message || "Task failed. Please try again."}`);
+  }
 }
 
 export async function runPlanSteps(
   ctx: { reply: (t: string, o?: object) => Promise<unknown> },
   chatId: number,
   plan: Plan,
-  steps: PlanStep[],
+  steps: PlanStep[]
 ) {
   const config = defaultAgentConfig();
   const tracker = new ActionTracker();
@@ -107,15 +123,19 @@ export async function runPlanSteps(
   const tools = { ...createAgentTools(executor), ...extraWebTools(tracker) };
 
   for (const step of steps) {
-    await ctx.reply(`🔧 Executing: *${step.title}*`, { parse_mode: 'Markdown' });
-    const prompt = [`Goal: ${plan.goal}`, `Step: ${step.title}`, step.description].join('\n');
-    const agent = new ToolLoopAgent({
-      ...agentOptions(config, 30),
-      tools,
-    });
-    const { text } = await agent.generate({ prompt });
-    if (text?.trim()) await replyMd(ctx, text.trim());
+    try {
+      await ctx.reply(`🔧 Executing: *${step.title}*`, { parse_mode: "Markdown" });
+      const prompt = [`Goal: ${plan.goal}`, `Step: ${step.title}`, step.description].join("\n");
+      const agent = new ToolLoopAgent({
+        ...agentOptions(config, 30),
+        tools,
+      });
+      const { text } = await agent.generate({ prompt });
+      if (text?.trim()) await replyMd(ctx, text.trim());
+    } catch (err: any) {
+      await ctx.reply(`⚠️ Step *${step.title}* encountered an issue: ${err?.message || "Timeout or rate limit"}. Continuing...`, { parse_mode: "Markdown" });
+    }
   }
 
- await finishOrApprove(ctx, chatId, tracker, executor, '✅ All steps done. No file changes needed.');
+  await finishOrApprove(ctx, chatId, tracker, executor, '✅ All steps done. No file changes needed.');
 }
