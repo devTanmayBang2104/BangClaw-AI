@@ -17,8 +17,11 @@ export async function runTelegramMode() {
   try {
     bot = new Telegraf(token);
     registerHandlers(bot);
-    bot.launch();
-    console.log(chalk.green("\n✓ Telegram bot is running! (Press Ctrl+C to stop)"));
+    bot.catch((err: any) => {
+      console.error(chalk.red("Telegram Bot Error:"), err?.message || err);
+    });
+
+    console.log(chalk.green("\n✓ Telegram bot is running! (Keep this terminal window open, press Ctrl+C to stop)"));
   } catch (err: any) {
     console.log(chalk.red(`\n❌ Failed to start Telegram bot: ${err.message}\n`));
     return;
@@ -27,20 +30,18 @@ export async function runTelegramMode() {
   try {
     await bot.telegram.sendMessage(ownerId, WELCOME, { parse_mode: "Markdown" });
     console.log(chalk.green("Sent welcome message to your Telegram chat.\n"));
-  } catch {
-    console.log(
-      chalk.cyan(
-        "📱 Action needed: Open your bot in Telegram and tap 'START': https://t.me/BangClaw4bot\n"
-      )
-    );
-  }
+  } catch {}
+
+  await bot.launch();
 
   await new Promise<void>((resolve) => {
-    const stop = () => {
+    process.once("SIGINT", () => {
       bot.stop("SIGINT");
       resolve();
-    };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
+    });
+    process.once("SIGTERM", () => {
+      bot.stop("SIGTERM");
+      resolve();
+    });
   });
 }
